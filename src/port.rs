@@ -5,6 +5,7 @@ use crate::jump::{two_by_two_to_block_pos, Jump};
 #[derive(Debug, Clone, Copy)]
 pub enum Port {
     TwoByTwo(BlockPos),
+    TwoByTwoPortal(BlockPos),
 }
 
 impl Port {
@@ -21,6 +22,25 @@ impl Port {
                 }
 
                 if pos.y < y + 1.0 || pos.y >= y + 1.05 {
+                    return false;
+                }
+
+                if pos.z < z - 0.3 || pos.z > z + 2.3 {
+                    return false;
+                }
+
+                true
+            }
+            Port::TwoByTwoPortal(platform) => {
+                let x = platform.x as f64;
+                let y = platform.y as f64;
+                let z = platform.z as f64;
+
+                if pos.x < x - 0.3 || pos.x > x + 2.3 {
+                    return false;
+                }
+
+                if pos.y < y || pos.y >= y + 0.5 {
                     return false;
                 }
 
@@ -47,12 +67,30 @@ impl Port {
 
                 return distance_x + distance_z <= height_above * 5.0;
             }
+            Port::TwoByTwoPortal(platform) => {
+                let x = platform.x as f64;
+                let y = platform.y as f64;
+                let z = platform.z as f64;
+
+                let distance_x = (pos.x - x - 1.0).abs();
+                let distance_z = (pos.z - z - 1.0).abs();
+                let height_above = pos.y - y + 1.0;
+
+                return distance_x + distance_z <= height_above * 5.0;
+            }
         }
     }
 
     pub fn center(&self) -> DVec3 {
         match self {
             Port::TwoByTwo(platform) => {
+                let x = platform.x as f64;
+                let y = platform.y as f64;
+                let z = platform.z as f64;
+
+                DVec3::new(x + 1.0, y + 1.0, z + 1.0)
+            }
+            Port::TwoByTwoPortal(platform) => {
                 let x = platform.x as f64;
                 let y = platform.y as f64;
                 let z = platform.z as f64;
@@ -116,6 +154,7 @@ impl Port {
                     ),
                 ]
             }
+            Port::TwoByTwoPortal(_) => Vec::new(),
         }
     }
 }

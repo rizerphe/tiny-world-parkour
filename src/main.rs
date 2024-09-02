@@ -28,6 +28,9 @@ use valence::protocol::Sound;
 struct Cli {
     /// The path to a Minecraft world save containing a `region` subdirectory.
     path: PathBuf,
+    /// The spawn position of the player.
+    #[clap(default_value = "0,196,0")]
+    spawn: String,
 }
 
 #[derive(Component)]
@@ -73,6 +76,13 @@ impl GameState {
         self.course.done()
     }
 
+    fn finished(&self, player_id: &Uuid) -> bool {
+        self.player_states
+            .get(player_id)
+            .map(|state| state.finished())
+            .unwrap_or(false)
+    }
+
     fn reset_player(&mut self, player_id: Uuid, pos: &mut Position) {
         let spawn = self.course.get_start();
 
@@ -98,6 +108,10 @@ impl GameState {
         self.player_states
             .get_mut(&player_id)
             .map(|state| state.resume());
+    }
+
+    fn reset_course(&mut self, layer: &mut ChunkLayer) {
+        self.course.reset(layer);
     }
 }
 
@@ -434,7 +448,18 @@ fn setup(
         }
     }
 
-    let course = ParkourCourse::new(BlockPos::new(0, 128, 0), &layer.chunk);
+    let position = cli
+        .spawn
+        .split(',')
+        .map(|s| s.trim().parse().ok())
+        .collect::<Vec<Option<i32>>>();
+    let position = BlockPos::new(
+        position[0].unwrap_or(0),
+        position[1].unwrap_or(196),
+        position[2].unwrap_or(0),
+    );
+
+    let course = ParkourCourse::new(position, &layer.chunk);
 
     command_scopes.link("parkour.actor", "parkour.command");
 
@@ -504,6 +529,9 @@ fn manage_course(
     let mut layer = layers.single_mut();
     let parkour = &mut courses.single_mut();
 
+    let mut platforms_left = i32::MAX;
+    let mut all_finished = true;
+
     for (mut client, mut pos, mut look, player_id) in &mut clients {
         // Get the player's current state
         let player_update = parkour.update_player_state(player_id.0, pos.as_mut(), look.as_mut());
@@ -543,11 +571,42 @@ fn manage_course(
                     "You are currently going backwards!".color(Color::RED),
                 );
             }
+            PlayerStateUpdate::Finished => {
+                client.send_action_bar_message("You have finished the course!".color(Color::GREEN));
+            }
+            PlayerStateUpdate::Finishing => {
+                client.play_sound(
+                    Sound::EntityPlayerLevelup,
+                    SoundCategory::Player,
+                    pos.0,
+                    1.0,
+                    1.0,
+                );
+            }
             _ => {}
         }
 
+        platforms_left = parkour.platforms_left(&player_id.0).min(platforms_left);
+        if !parkour.finished(&player_id.0) {
+            all_finished = false;
+        }
+    }
+
+    if parkour.done() {
+        // The course is created. Therefore, we see whether all players have finished.
+        // If so, we spawn an entire new course.
+
+        if all_finished {
+            for (_, mut pos, _, player_id) in &mut clients {
+                parkour.reset_player(player_id.0, pos.as_mut());
+            }
+
+            parkour.reset_course(&mut layer);
+        }
+    } else {
         // Spawn the platforms
-        while parkour.platforms_left(&player_id.0) < 1500 {
+        while platforms_left < 1500 {
+            platforms_left += 1;
             if !parkour.spawn_platform(&mut layer) {
                 break;
             }

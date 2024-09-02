@@ -1,7 +1,7 @@
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use valence::{
     block::{PropName, PropValue},
-    prelude::{BiomeId, Block},
+    prelude::BiomeId,
     registry::RegistryIdx,
     BlockState,
 };

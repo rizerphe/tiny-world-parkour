@@ -16,6 +16,8 @@ pub enum PlayerStateUpdate {
     OnPastPlatform,
     TeleportedBack,
     Paused,
+    Finishing,
+    Finished,
 }
 
 fn shuffled_options(start: Port, layer: &ChunkLayer) -> Vec<Jump> {
@@ -151,6 +153,17 @@ impl ParkourCourse {
             jump.build(layer);
         }
     }
+
+    pub fn reset(&mut self, layer: &mut ChunkLayer) {
+        for jump in self.jumps.iter() {
+            jump.despawn(layer);
+        }
+
+        // Delete all but first:
+        self.jumps.truncate(1);
+
+        self.generated_end = false;
+    }
 }
 
 pub struct PlayerOnCourse {
@@ -158,6 +171,7 @@ pub struct PlayerOnCourse {
     last_valid_position: DVec3,
     last_valid_look: Vec3,
     paused: bool,
+    finished: bool,
 }
 
 impl PlayerOnCourse {
@@ -171,6 +185,7 @@ impl PlayerOnCourse {
             ),
             last_valid_look: Vec3::new(1.0, 0.0, 0.0),
             paused: false,
+            finished: false,
         }
     }
 
@@ -188,6 +203,10 @@ impl PlayerOnCourse {
         player_pos: &mut Position,
         player_look: &mut Look,
     ) -> PlayerStateUpdate {
+        if self.finished {
+            return PlayerStateUpdate::Finished;
+        }
+
         if self.paused {
             return PlayerStateUpdate::Paused;
         }
@@ -198,6 +217,11 @@ impl PlayerOnCourse {
                 if i < self.last_platform as usize {
                     return PlayerStateUpdate::OnPastPlatform;
                 } else if i == self.last_platform as usize {
+                    if i == course.len() as usize - 1 && course.done() {
+                        self.finished = true;
+                        return PlayerStateUpdate::Finishing;
+                    }
+
                     return PlayerStateUpdate::OnCourse;
                 }
 
@@ -239,5 +263,9 @@ impl PlayerOnCourse {
 
     pub fn resume(&mut self) {
         self.paused = false;
+    }
+
+    pub fn finished(&self) -> bool {
+        self.finished
     }
 }

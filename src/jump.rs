@@ -53,7 +53,10 @@ impl Jump {
                         });
                     }
                 }
+
+                self.endpoint = Port::TwoByTwoPortal(*pos);
             }
+            Port::TwoByTwoPortal(_) => (),
         }
     }
 

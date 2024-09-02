@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.11", features = ["derive"] }
 rand = { version = "0.8.5", features = ["small_rng"] }
-valence = { git = "https://github.com/valence-rs/valence" }
+valence = { git = "https://github.com/valence-rs/valence", rev="4ba2ef3b7a8eee9dcf9187e71b2ac51a5db33757" }
